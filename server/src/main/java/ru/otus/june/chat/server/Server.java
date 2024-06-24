@@ -41,4 +41,29 @@ public class Server {
             c.sendMessage(message);
         }
     }
+
+    public synchronized void broadcastMessageToUser(ClientHandler ch, String message) {
+        int index1 = message.indexOf(' ');
+        if (index1 < 0){
+            return;
+        }
+        index1++;
+        int index2 = message.indexOf(' ', index1);
+        if(index2 < 0){
+            return;
+        }
+        String name = message.substring(index1, index2++);
+        String mess = message.substring(index2);
+        if(name.isEmpty() || mess.isEmpty()){
+            return;
+        }
+        mess = ch.getUsername() + ": " + mess;
+        for (ClientHandler c : clients) {
+            if (c.getUsername().equals(name)) {
+                c.sendMessage(mess);
+                ch.sendMessage(mess);
+                break;
+            }
+        }
+    }
 }
