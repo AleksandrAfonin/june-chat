@@ -6,64 +6,56 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Server {
-    private int port;
-    private List<ClientHandler> clients;
+  private int port;
+  private List<ClientHandler> clients;
 
-    public Server(int port) {
-        this.port = port;
-        this.clients = new ArrayList<>();
+  public Server(int port) {
+    this.port = port;
+    this.clients = new ArrayList<>();
+  }
+
+  public void start() {
+    try (ServerSocket serverSocket = new ServerSocket(port)) {
+      System.out.println("Сервер запущен на порту: " + port);
+      while (true) {
+        Socket socket = serverSocket.accept();
+        subscribe(new ClientHandler(this, socket));
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  public synchronized void subscribe(ClientHandler clientHandler) {
+    broadcastMessage("В чат зашел: " + clientHandler.getUsername());
+    clients.add(clientHandler);
+  }
+
+  public synchronized void unsubscribe(ClientHandler clientHandler) {
+    clients.remove(clientHandler);
+    broadcastMessage("Из чата вышел: " + clientHandler.getUsername());
+  }
+
+  public synchronized void broadcastMessage(String message) {
+    for (ClientHandler c : clients) {
+      c.sendMessage(message);
+    }
+  }
+
+  public synchronized void sendPrivateMessage(ClientHandler ch, String message) {
+    String[] str = message.split(" ");
+    if (str.length < 3) {
+      return;
     }
 
-    public void start() {
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Сервер запущен на порту: " + port);
-            while (true) {
-                Socket socket = serverSocket.accept();
-                subscribe(new ClientHandler(this, socket));
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    String mess = ch.getUsername() + " -> " + str[1] + ": " +
+            message.substring(str[0].length() + str[1].length() + 2);
+    for (ClientHandler c : clients) {
+      if (c.getUsername().equals(str[1])) {
+        c.sendMessage(mess);
+        ch.sendMessage(mess);
+        break;
+      }
     }
-
-    public synchronized void subscribe(ClientHandler clientHandler) {
-        broadcastMessage("В чат зашел: " + clientHandler.getUsername());
-        clients.add(clientHandler);
-    }
-
-    public synchronized void unsubscribe(ClientHandler clientHandler) {
-        clients.remove(clientHandler);
-        broadcastMessage("Из чата вышел: " + clientHandler.getUsername());
-    }
-
-    public synchronized void broadcastMessage(String message) {
-        for (ClientHandler c : clients) {
-            c.sendMessage(message);
-        }
-    }
-
-    public synchronized void broadcastMessageToUser(ClientHandler ch, String message) {
-        int index1 = message.indexOf(' ');
-        if (index1 < 0){
-            return;
-        }
-        index1++;
-        int index2 = message.indexOf(' ', index1);
-        if(index2 < 0){
-            return;
-        }
-        String name = message.substring(index1, index2++);
-        String mess = message.substring(index2);
-        if(name.isEmpty() || mess.isEmpty()){
-            return;
-        }
-        mess = ch.getUsername() + ": " + mess;
-        for (ClientHandler c : clients) {
-            if (c.getUsername().equals(name)) {
-                c.sendMessage(mess);
-                ch.sendMessage(mess);
-                break;
-            }
-        }
-    }
+  }
 }
