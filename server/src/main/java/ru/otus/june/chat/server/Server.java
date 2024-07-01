@@ -43,13 +43,12 @@ public class Server {
   }
 
   public synchronized void sendPrivateMessage(ClientHandler ch, String message) {
-    String[] str = message.split(" ");
+    String[] str = message.split(" ", 3);
     if (str.length < 3) {
       return;
     }
 
-    String mess = ch.getUsername() + " -> " + str[1] + ": " +
-            message.substring(str[0].length() + str[1].length() + 2);
+    String mess = ch.getUsername() + " -> " + str[1] + ": " + str[2];
     for (ClientHandler c : clients) {
       if (c.getUsername().equals(str[1])) {
         c.sendMessage(mess);
