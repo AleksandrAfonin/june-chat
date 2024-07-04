@@ -40,7 +40,7 @@ public class Server {
 
   public synchronized void unsubscribe(ClientHandler clientHandler) {
     clients.remove(clientHandler);
-    if (clientHandler.getUsername() == null){
+    if (clientHandler.getUsername() == null) {
       return;
     }
     broadcastMessage("Из чата вышел: " + clientHandler.getUsername());
@@ -68,12 +68,24 @@ public class Server {
     }
   }
 
-  public synchronized boolean isUsernameBusy(String username){
-    for(ClientHandler c : clients){
-      if(c.getUsername().equals(username)){
+  public synchronized boolean isUsernameBusy(String username) {
+    for (ClientHandler c : clients) {
+      if (c.getUsername().equals(username)) {
         return true;
       }
     }
     return false;
+  }
+
+  public synchronized void handleKick(ClientHandler ch, String name) {
+    for (ClientHandler c : clients) {
+      if (c.getUsername().equals(name)) {
+        c.sendMessage("/kickok");
+        ch.sendMessage("Пользователь " + name + " заблокирован");
+        c.setInChat(false);
+        return;
+      }
+    }
+    ch.sendMessage("Пользователя " + name + " нет в чате");
   }
 }

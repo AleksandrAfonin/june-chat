@@ -12,6 +12,16 @@ public class ClientHandler {
   private DataOutputStream out;
 
   private String username;
+  private boolean inChat;
+  private Role userRole;
+
+  public void setInChat(boolean inChat) {
+    this.inChat = inChat;
+  }
+
+  public void setUserRole(Role userRole) {
+    this.userRole = userRole;
+  }
 
   public String getUsername() {
     return username;
@@ -26,6 +36,7 @@ public class ClientHandler {
     this.socket = socket;
     this.in = new DataInputStream(socket.getInputStream());
     this.out = new DataOutputStream(socket.getOutputStream());
+    this.inChat = true;
     new Thread(() -> {
       try {
         System.out.println("Подключился новый клиент");
@@ -41,7 +52,7 @@ public class ClientHandler {
               sendMessage("Не верный формат команды /auth");
               continue;
             }
-            if(server.getAuthenticationProvider().authenticate(this, elements[1], elements[2])){
+            if (server.getAuthenticationProvider().authenticate(this, elements[1], elements[2])) {
               break;
             }
             continue;
@@ -52,7 +63,7 @@ public class ClientHandler {
               sendMessage("Не верный формат команды /register");
               continue;
             }
-            if(server.getAuthenticationProvider().registration(this, elements[1], elements[2], elements[3])){
+            if (server.getAuthenticationProvider().registration(this, elements[1], elements[2], elements[3])) {
               break;
             }
             continue;
@@ -66,12 +77,29 @@ public class ClientHandler {
               sendMessage("/exitok");
               break;
             }
-            if (message.startsWith("/w ")) {
-              server.sendPrivateMessage(this, message);
+            if (inChat) {
+              if (message.startsWith("/w ")) {
+                server.sendPrivateMessage(this, message);
+              }
+              if (message.startsWith("/kick ")) {
+                if (userRole == Role.ADMIN) {
+                  String[] elements = message.split(" ");
+                  if (elements.length != 2) {
+                    sendMessage("Не верный формат команды /kick");
+                    continue;
+                  }
+                  server.handleKick(this, elements[1]);
+                } else {
+                  sendMessage("У вас не достоточно прав для команды /kick");
+                  continue;
+                }
+              }
             }
             continue;
           }
-          server.broadcastMessage(username + ": " + message);
+          if (inChat) {
+            server.broadcastMessage(username + ": " + message);
+          }
         }
       } catch (IOException e) {
         e.printStackTrace();
@@ -82,10 +110,12 @@ public class ClientHandler {
   }
 
   public void sendMessage(String message) {
-    try {
-      out.writeUTF(message);
-    } catch (IOException e) {
-      e.printStackTrace();
+    if (message.equals("/exitok") || inChat) {
+      try {
+        out.writeUTF(message);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
   }
 

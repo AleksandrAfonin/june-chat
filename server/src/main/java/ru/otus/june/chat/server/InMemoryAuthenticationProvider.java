@@ -8,11 +8,21 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
     private String login;
     private String password;
     private String username;
+    private Role userRole;
 
-    public User(String login, String password, String username) {
+    public User(String login, String password, String username, String role) {
       this.login = login;
       this.password = password;
       this.username = username;
+      for (Role r : Role.values()) {
+        if (r.name().equalsIgnoreCase(role)) {
+          this.userRole = r;
+          break;
+        }
+      }
+      if (this.userRole == null) {
+        this.userRole = Role.USER;
+      }
     }
   }
 
@@ -22,9 +32,9 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
   public InMemoryAuthenticationProvider(Server server) {
     this.server = server;
     this.users = new ArrayList<>();
-    this.users.add(new User("login1", "pass1", "bob"));
-    this.users.add(new User("login2", "pass2", "user2"));
-    this.users.add(new User("login3", "pass3", "user3"));
+    this.users.add(new User("login1", "pass1", "bob", "ADMIN"));
+    this.users.add(new User("login2", "pass2", "user2", "USER"));
+    this.users.add(new User("login3", "pass3", "user3", "USER"));
   }
 
   @Override
@@ -59,6 +69,15 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
     return false;
   }
 
+  private Role getUserRoleByName(String name) {
+    for (User u : users) {
+      if (u.username.equals(name)) {
+        return u.userRole;
+      }
+    }
+    return null;
+  }
+
   @Override
   public synchronized boolean authenticate(ClientHandler clientHandler, String login, String password) {
     String authUsername = getUsernameByLoginAndPassword(login, password);
@@ -71,6 +90,7 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
       return false;
     }
     clientHandler.setUsername(authUsername);
+    clientHandler.setUserRole(getUserRoleByName(authUsername));
     server.subscribe(clientHandler);
     clientHandler.sendMessage("/authok " + authUsername);
     return true;
@@ -90,8 +110,9 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
       clientHandler.sendMessage("Указанное имя пользователя уже занято");
       return false;
     }
-    users.add(new User(login, password, username));
+    users.add(new User(login, password, username, "USER"));
     clientHandler.setUsername(username);
+    clientHandler.setUserRole(Role.USER);
     server.subscribe(clientHandler);
     clientHandler.sendMessage("/regok " + username);
     return true;
