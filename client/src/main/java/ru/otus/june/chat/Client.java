@@ -31,6 +31,10 @@ public class Client {
             System.out.println("Удалось успешно пройти регистрацию и войти в чат под именем пользователя: " + message.split(" ")[1]);
             continue;
           }
+          if (message.equals("/kickok")) {
+            System.out.println("Вы заблокированы");
+            continue;
+          }
           System.out.println(message);
         }
       } catch (IOException e) {
