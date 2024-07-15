@@ -4,6 +4,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ClientHandler {
   private Server server;
@@ -13,14 +15,18 @@ public class ClientHandler {
 
   private String username;
   private boolean inChat;
-  private Role userRole;
+  private List<Role> userRoles;
 
   public void setInChat(boolean inChat) {
     this.inChat = inChat;
   }
 
   public void setUserRole(Role userRole) {
-    this.userRole = userRole;
+    this.userRoles.add(userRole);
+  }
+
+  public void setUserRoles(List<Role> roles) {
+    this.userRoles = roles;
   }
 
   public String getUsername() {
@@ -37,6 +43,7 @@ public class ClientHandler {
     this.in = new DataInputStream(socket.getInputStream());
     this.out = new DataOutputStream(socket.getOutputStream());
     this.inChat = true;
+    this.userRoles = new ArrayList<>();
     new Thread(() -> {
       try {
         System.out.println("Подключился новый клиент");
@@ -82,7 +89,7 @@ public class ClientHandler {
                 server.sendPrivateMessage(this, message);
               }
               if (message.startsWith("/kick ")) {
-                if (userRole == Role.ADMIN) {
+                if (isHaveRole(userRoles, Role.ADMIN)) {
                   String[] elements = message.split(" ");
                   if (elements.length != 2) {
                     sendMessage("Не верный формат команды /kick");
@@ -107,6 +114,15 @@ public class ClientHandler {
         disconnect();
       }
     }).start();
+  }
+
+  private boolean isHaveRole(List<Role> userRoles, Role role) {
+    for (Role r : userRoles) {
+      if (r == role) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public void sendMessage(String message) {
@@ -143,4 +159,6 @@ public class ClientHandler {
       e.printStackTrace();
     }
   }
+
+
 }

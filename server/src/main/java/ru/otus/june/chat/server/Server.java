@@ -13,6 +13,7 @@ public class Server {
   public Server(int port) {
     this.port = port;
     this.clients = new ArrayList<>();
+    //this.authenticationProvider = new DBProvider(this);
     this.authenticationProvider = new InMemoryAuthenticationProvider(this);
   }
 

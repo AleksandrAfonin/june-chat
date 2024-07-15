@@ -8,20 +8,21 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
     private String login;
     private String password;
     private String username;
-    private Role userRole;
+    private List<Role> userRoles;
 
     public User(String login, String password, String username, String role) {
       this.login = login;
       this.password = password;
       this.username = username;
+      this.userRoles = new ArrayList<>();
       for (Role r : Role.values()) {
         if (r.name().equalsIgnoreCase(role)) {
-          this.userRole = r;
+          this.userRoles.add(r);
           break;
         }
       }
-      if (this.userRole == null) {
-        this.userRole = Role.USER;
+      if (this.userRoles.isEmpty()) {
+        this.userRoles.add(Role.USER);
       }
     }
   }
@@ -69,10 +70,10 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
     return false;
   }
 
-  private Role getUserRoleByName(String name) {
+  private List<Role> getUserRolesByName(String name) {
     for (User u : users) {
       if (u.username.equals(name)) {
-        return u.userRole;
+        return u.userRoles;
       }
     }
     return null;
@@ -90,7 +91,7 @@ public class InMemoryAuthenticationProvider implements AuthenticationProvider {
       return false;
     }
     clientHandler.setUsername(authUsername);
-    clientHandler.setUserRole(getUserRoleByName(authUsername));
+    clientHandler.setUserRoles(getUserRolesByName(authUsername));
     server.subscribe(clientHandler);
     clientHandler.sendMessage("/authok " + authUsername);
     return true;
