@@ -25,7 +25,6 @@ public class DBProvider implements AuthenticationProvider {
            (login, password, username, date, isdeleted)
            VALUES (?, ?, ?, ?, ?)
            """;
-
   private final String ADD_ROLE_TO_USER = """
           INSERT INTO roles_to_users
            (id_user, id_role)
@@ -35,9 +34,6 @@ public class DBProvider implements AuthenticationProvider {
   public DBProvider(Server server) {
     this.server = server;
   }
-
-//  public DBProvider() {
-//  }
 
   @Override
   public void initialize() {
@@ -56,12 +52,20 @@ public class DBProvider implements AuthenticationProvider {
       return false;
     }
     clientHandler.setUsername(authUsername);
-    clientHandler.setUserRoles(getUserRolesByName(authUsername));
+    clientHandler.setUserRoles(getUserRolesByUsername(authUsername));
     server.subscribe(clientHandler);
     clientHandler.sendMessage("/authok " + authUsername);
     return true;
   }
 
+  /**
+   * Регистрация нового пользователя вход в чат
+   * @param clientHandler
+   * @param login
+   * @param password
+   * @param username
+   * @return true/false
+   */
   @Override
   public boolean registration(ClientHandler clientHandler, String login, String password, String username) {
     if (login.trim().length() < 3 || password.trim().length() < 6 || username.trim().length() < 1) {
@@ -77,7 +81,7 @@ public class DBProvider implements AuthenticationProvider {
       return false;
     }
 
-    if (addNewUser(login, password, username)) {
+    if (addNewUser(clientHandler, login, password, username)) {
       clientHandler.setUsername(username);
       clientHandler.setUserRole(Role.USER);
       server.subscribe(clientHandler);
@@ -87,7 +91,15 @@ public class DBProvider implements AuthenticationProvider {
     return false;
   }
 
-  public boolean addNewUser(String login, String password, String username) {
+  /**
+   * Добавление нового пользователя в БД
+   * @param clientHandler
+   * @param login
+   * @param password
+   * @param username
+   * @return true/false
+   */
+  private boolean addNewUser(ClientHandler clientHandler, String login, String password, String username) {
     try (Connection connection = DriverManager.getConnection(DATABASE_URL)) {
       try (PreparedStatement statement = connection.prepareStatement(ADD_NEW_USER)) {
         statement.setString(1, login);
@@ -95,27 +107,33 @@ public class DBProvider implements AuthenticationProvider {
         statement.setString(3, username);
         statement.setString(4, (new SimpleDateFormat("dd.MM.YYYY")).format(new Date(System.currentTimeMillis())));
         statement.setBoolean(5, false);
-        if (statement.executeUpdate() != 0) {
-          System.out.println("The new user added !");
-        } else {
+        if (statement.executeUpdate() == 0) {
+          clientHandler.sendMessage("Не удалось добавить пользователя в базу данных.");
           return false;
         }
       }
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
-    return addRoleToUserByUsername(username, Role.USER);
+    return addRoleToUserByUsername(clientHandler, username, Role.USER);
   }
 
-  public boolean addRoleToUserByUsername(String username, Role role) {
+  /**
+   * Добавление новой роли пользователю по его имени
+   * @param clientHandler
+   * @param username
+   * @param role
+   * @return true/false
+   */
+  public boolean addRoleToUserByUsername(ClientHandler clientHandler, String username, Role role) {
     int id_user;
     if ((id_user = getUserIdByName(username)) < 0){
-      System.out.println("No such user with name: " + username);
+      clientHandler.sendMessage("Пользователь по имени " + username + " не найден в базе данных");
       return false;
     }
     int id_role;
     if ((id_role = getRoleIdByRole(role)) < 0){
-      System.out.println("No such role with name: " + role.name());
+      clientHandler.sendMessage("Роль '" + role.name() + "' не найдена в базе данных");
       return false;
     }
 
@@ -124,7 +142,7 @@ public class DBProvider implements AuthenticationProvider {
         statement.setInt(1, id_user);
         statement.setInt(2, id_role);
         if (statement.executeUpdate() != 0) {
-          System.out.println("The new role added to user " + username);
+          clientHandler.sendMessage("Для пользователя " + username + " добавлена роль '" + role.name() + "'");
           return true;
         } else {
           return false;
@@ -135,6 +153,11 @@ public class DBProvider implements AuthenticationProvider {
     }
   }
 
+  /**
+   * Получить id роли по перечислению Role
+   * @param role
+   * @return id
+   */
   private int getRoleIdByRole(Role role) {
     try (Connection connection = DriverManager.getConnection(DATABASE_URL)) {
       try (PreparedStatement statement = connection.prepareStatement(GET_ROLEID_BY_ROLENAME)) {
@@ -144,7 +167,6 @@ public class DBProvider implements AuthenticationProvider {
             int id_role = resultSet.getInt("id");
             return id_role;
           } else {
-            System.out.println("No such role");
             return -1;
           }
         }
@@ -154,6 +176,11 @@ public class DBProvider implements AuthenticationProvider {
     }
   }
 
+  /**
+   * Получить id пользователя по его имени
+   * @param username
+   * @return id
+   */
   private int getUserIdByName(String username) {
     try (Connection connection = DriverManager.getConnection(DATABASE_URL)) {
       try (PreparedStatement statement = connection.prepareStatement(GET_USERID_BY_NAME)) {
@@ -163,7 +190,6 @@ public class DBProvider implements AuthenticationProvider {
             int id_user = resultSet.getInt("id");
             return id_user;
           } else {
-            System.out.println("No such user: " + username);
             return -1;
           }
         }
@@ -173,6 +199,12 @@ public class DBProvider implements AuthenticationProvider {
     }
   }
 
+  /**
+   * Получение имени ползователя по логину и паролю
+   * @param login
+   * @param password
+   * @return имя пользователя/null
+   */
   private String getUsernameByLoginAndPassword(String login, String password) {
     try (Connection connection = DriverManager.getConnection(DATABASE_URL)) {
       try (PreparedStatement statement = connection.prepareStatement(USERNAME_BY_LOGIN_AND_PASSWORD)) {
@@ -180,11 +212,8 @@ public class DBProvider implements AuthenticationProvider {
         statement.setString(2, password);
         try (ResultSet resultSet = statement.executeQuery()) {
           if (resultSet.next()) {
-            String username = resultSet.getString("username");
-            System.out.println("Username: " + username);
-            return username;
+            return resultSet.getString("username");
           } else {
-            System.out.println("No such user");
             return null;
           }
         }
@@ -194,17 +223,19 @@ public class DBProvider implements AuthenticationProvider {
     }
   }
 
+  /**
+   * Проверка на уже существование логина
+   * @param login
+   * @return true/false
+   */
   private boolean isLoginAlreadyExits(String login) {
     try (Connection connection = DriverManager.getConnection(DATABASE_URL)) {
       try (PreparedStatement statement = connection.prepareStatement(IS_LOGIN_EXISTS)) {
         statement.setString(1, login);
         try (ResultSet resultSet = statement.executeQuery()) {
           if (resultSet.next()) {
-            String l = resultSet.getString("login");
-            System.out.println("Login Already Exits: " + l);
             return true;
           } else {
-            System.out.println("No such login");
             return false;
           }
         }
@@ -214,17 +245,19 @@ public class DBProvider implements AuthenticationProvider {
     }
   }
 
+  /**
+   * Проверка на уже существование имени ползователя
+   * @param username
+   * @return true/false
+   */
   private boolean isUsernameAlreadyExists(String username) {
     try (Connection connection = DriverManager.getConnection(DATABASE_URL)) {
       try (PreparedStatement statement = connection.prepareStatement(IS_USERNAME_EXISTS)) {
         statement.setString(1, username);
         try (ResultSet resultSet = statement.executeQuery()) {
           if (resultSet.next()) {
-            String u = resultSet.getString("username");
-            System.out.println("Username Already Exits: " + u);
             return true;
           } else {
-            System.out.println("No such username");
             return false;
           }
         }
@@ -234,7 +267,12 @@ public class DBProvider implements AuthenticationProvider {
     }
   }
 
-  private List<Role> getUserRolesByName(String name) {
+  /**
+   * Получение списка ролей пользователя по его имени
+   * @param name
+   * @return список ролей
+   */
+  private List<Role> getUserRolesByUsername(String name) {
     List<Role> roles = new ArrayList<>();
     try (Connection connection = DriverManager.getConnection(DATABASE_URL)) {
       try (PreparedStatement statement = connection.prepareStatement(GET_USER_ROLES_BY_NAME)) {
